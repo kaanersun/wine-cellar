@@ -1267,4 +1267,3 @@ export default function WineCellar() {
   );
 }
 
-export default WineCellar;
