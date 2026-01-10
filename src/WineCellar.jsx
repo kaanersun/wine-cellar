@@ -112,6 +112,7 @@ export default function WineCellar() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importJson, setImportJson] = useState('');
   const [importError, setImportError] = useState(null);
+  const [importType, setImportType] = useState('inventory');
   const [showExportModal, setShowExportModal] = useState(false);
   const fileInputRef = useRef(null);
   const scanModeRef = useRef('cellar');
@@ -398,9 +399,9 @@ export default function WineCellar() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="h-screen flex flex-col bg-stone-50">
       {/* Header */}
-      <header className="bg-stone-900 text-white px-6 py-4">
+      <header className="bg-stone-900 text-white px-6 py-4 shrink-0">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Wine className="w-8 h-8 text-red-400" />
@@ -417,7 +418,7 @@ export default function WineCellar() {
       </header>
 
       {/* Navigation */}
-      <nav className="bg-white border-b border-stone-200 px-6">
+      <nav className="bg-white border-b border-stone-200 px-6 shrink-0">
         <div className="max-w-5xl mx-auto flex gap-1">
           {[
             { id: 'inventory', label: 'Inventory', icon: Wine },
@@ -440,7 +441,8 @@ export default function WineCellar() {
         </div>
       </nav>
 
-      <main className="max-w-5xl mx-auto px-6 py-6">
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-5xl mx-auto px-6 py-6">
         {/* Inventory View */}
         {view === 'inventory' && (
           <div>
@@ -544,83 +546,84 @@ export default function WineCellar() {
                   const windowStatus = getDrinkWindowStatus(wine);
                   return (
                     <div key={wine.id} className="bg-white rounded-lg border border-stone-200 p-4 hover:shadow-sm transition-shadow">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-semibold text-stone-900">{wine.vintage} {wine.name}</h3>
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${windowStatus.color}`}>
-                              {windowStatus.label}
-                            </span>
-                          </div>
-                          <p className="text-sm text-stone-600 mt-0.5">{wine.producer}</p>
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-sm text-stone-500">
-                            {wine.varietal && <span>{wine.varietal}</span>}
-                            {wine.region && (
-                              <span className="flex items-center gap-1">
-                                <MapPin className="w-3 h-3" />
-                                {wine.region}
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-semibold text-stone-900">{wine.vintage} {wine.name}</h3>
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${windowStatus.color}`}>
+                                {windowStatus.label}
                               </span>
-                            )}
-                            {wine.location && (
-                              <span className="text-stone-400">📍 {wine.location}</span>
-                            )}
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {wine.drinkFrom}–{wine.drinkTo}
-                            </span>
+                            </div>
+                            <p className="text-sm text-stone-600 mt-0.5">{wine.producer}</p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => {
+                                setFormData({
+                                  ...wine,
+                                  tastingNotes: '',
+                                  rating: '',
+                                  drinkDate: new Date().toISOString().split('T')[0]
+                                });
+                                setAddMode('history');
+                                setEditingId(null);
+                                setEditingDrunkId(null);
+                                setDrinkingFromId(wine.id);
+                                setShowAddForm(true);
+                              }}
+                              className="px-2 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                            >
+                              Drink
+                            </button>
+                            <div className="flex items-center bg-stone-100 rounded-lg">
+                              <button
+                                onClick={() => adjustQuantity(wine.id, -1)}
+                                className="w-7 h-7 flex items-center justify-center text-stone-600 hover:bg-stone-200 rounded-l-lg transition-colors text-sm"
+                              >
+                                −
+                              </button>
+                              <span className="w-6 text-center text-sm font-medium">{wine.quantity}</span>
+                              <button
+                                onClick={() => adjustQuantity(wine.id, 1)}
+                                className="w-7 h-7 flex items-center justify-center text-stone-600 hover:bg-stone-200 rounded-r-lg transition-colors text-sm"
+                              >
+                                +
+                              </button>
+                            </div>
+                            <button
+                              onClick={() => handleEdit(wine)}
+                              className="p-1.5 text-stone-400 hover:text-stone-600 transition-colors"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(wine.id)}
+                              className="p-1.5 text-stone-400 hover:text-red-600 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            onClick={() => {
-                              setFormData({
-                                ...wine,
-                                tastingNotes: '',
-                                rating: '',
-                                drinkDate: new Date().toISOString().split('T')[0]
-                              });
-                              setAddMode('history');
-                              setEditingId(null);
-                              setEditingDrunkId(null);
-                              setDrinkingFromId(wine.id);
-                              setShowAddForm(true);
-                            }}
-                            className="px-2 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
-                          >
-                            Drink
-                          </button>
-                          <div className="flex items-center bg-stone-100 rounded-lg">
-                            <button
-                              onClick={() => adjustQuantity(wine.id, -1)}
-                              className="w-7 h-7 flex items-center justify-center text-stone-600 hover:bg-stone-200 rounded-l-lg transition-colors text-sm"
-                            >
-                              −
-                            </button>
-                            <span className="w-6 text-center text-sm font-medium">{wine.quantity}</span>
-                            <button
-                              onClick={() => adjustQuantity(wine.id, 1)}
-                              className="w-7 h-7 flex items-center justify-center text-stone-600 hover:bg-stone-200 rounded-r-lg transition-colors text-sm"
-                            >
-                              +
-                            </button>
-                          </div>
-                          <button
-                            onClick={() => handleEdit(wine)}
-                            className="p-1.5 text-stone-400 hover:text-stone-600 transition-colors"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(wine.id)}
-                            className="p-1.5 text-stone-400 hover:text-red-600 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                        <div className="flex items-center gap-3 text-sm text-stone-500 whitespace-nowrap overflow-x-auto">
+                          {wine.varietal && <span>{wine.varietal}</span>}
+                          {wine.varietal && wine.region && <span className="text-stone-300">•</span>}
+                          {wine.region && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {wine.region}
+                            </span>
+                          )}
+                          {(wine.varietal || wine.region) && <span className="text-stone-300">•</span>}
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {wine.drinkFrom}–{wine.drinkTo}
+                          </span>
                         </div>
                       </div>
                       {wine.notes && (
                         <p className="text-sm text-stone-500 mt-3 italic break-words">"{wine.notes}"</p>
-                      )}
+                      )}}
                     </div>
                   );
                 })}
@@ -812,6 +815,7 @@ export default function WineCellar() {
             )}
           </div>
         )}
+        </div>
       </main>
 
       {/* Hidden file input - always rendered so it works from any view */}
@@ -819,7 +823,6 @@ export default function WineCellar() {
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         onChange={handleImageUpload}
         className="hidden"
       />
@@ -1099,7 +1102,7 @@ export default function WineCellar() {
         <div className="fixed inset-0 bg-black/50 flex items-start justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full my-8">
             <div className="flex items-center justify-between p-4 border-b border-stone-200">
-              <h2 className="text-lg font-semibold">Import Wines</h2>
+              <h2 className="text-lg font-semibold">Import Data</h2>
               <button 
                 onClick={() => setShowImportModal(false)}
                 className="p-1 text-stone-400 hover:text-stone-600"
@@ -1109,8 +1112,43 @@ export default function WineCellar() {
             </div>
             
             <div className="p-4 space-y-4">
+              {/* Import Type Tabs */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setImportType('inventory');
+                    setImportError(null);
+                  }}
+                  className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                    importType === 'inventory'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                  }`}
+                >
+                  <Wine className="w-4 h-4 inline mr-2" />
+                  Inventory
+                </button>
+                <button
+                  onClick={() => {
+                    setImportType('history');
+                    setImportError(null);
+                  }}
+                  className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                    importType === 'history'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                  }`}
+                >
+                  <BookOpen className="w-4 h-4 inline mr-2" />
+                  History
+                </button>
+              </div>
+
               <p className="text-sm text-stone-600">
-                Paste your wine data as JSON below. Each wine should have: name, producer, vintage, varietal, region, quantity, drinkFrom, drinkTo.
+                {importType === 'inventory' 
+                  ? 'Paste your wine inventory as JSON. Each wine should have: name, producer, vintage, varietal, region, quantity, drinkFrom, drinkTo.'
+                  : 'Paste your tasting history as JSON. Each entry should have: name, producer, vintage, drinkDate, tastingNotes, rating.'
+                }
               </p>
               
               <textarea
@@ -1119,7 +1157,10 @@ export default function WineCellar() {
                   setImportJson(e.target.value);
                   setImportError(null);
                 }}
-                placeholder={`[\n  {\n    "name": "Wine Name",\n    "producer": "Producer",\n    "vintage": 2020,\n    "varietal": "Cabernet Sauvignon",\n    "region": "Napa Valley",\n    "quantity": 1,\n    "drinkFrom": 2024,\n    "drinkTo": 2030\n  }\n]`}
+                placeholder={importType === 'inventory' 
+                  ? `[\n  {\n    "name": "Wine Name",\n    "producer": "Producer",\n    "vintage": 2020,\n    "varietal": "Cabernet Sauvignon",\n    "region": "Napa Valley",\n    "quantity": 1,\n    "drinkFrom": 2024,\n    "drinkTo": 2030\n  }\n]`
+                  : `[\n  {\n    "name": "Wine Name",\n    "producer": "Producer",\n    "vintage": 2020,\n    "drinkDate": "2024-01-15",\n    "tastingNotes": "Great wine!",\n    "rating": 5\n  }\n]`
+                }
                 rows={12}
                 className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-500"
               />
@@ -1143,24 +1184,39 @@ export default function WineCellar() {
                   onClick={() => {
                     try {
                       const parsed = JSON.parse(importJson);
-                      const winesArray = Array.isArray(parsed) ? parsed : [parsed];
+                      const dataArray = Array.isArray(parsed) ? parsed : [parsed];
                       
-                      const newWines = winesArray.map((w, i) => ({
-                        id: Date.now() + i,
-                        name: w.name || '',
-                        producer: w.producer || '',
-                        vintage: w.vintage || currentYear - 5,
-                        varietal: w.varietal || '',
-                        region: w.region || '',
-                        quantity: w.quantity || 1,
-                        location: w.location || '',
-                        drinkFrom: w.drinkFrom || currentYear,
-                        drinkTo: w.drinkTo || currentYear + 10,
-                        notes: w.notes || '',
-                        price: w.price || ''
-                      }));
+                      if (importType === 'inventory') {
+                        const newWines = dataArray.map((w, i) => ({
+                          id: Date.now() + i,
+                          name: w.name || '',
+                          producer: w.producer || '',
+                          vintage: w.vintage || currentYear - 5,
+                          varietal: w.varietal || '',
+                          region: w.region || '',
+                          quantity: w.quantity || 1,
+                          location: w.location || '',
+                          drinkFrom: w.drinkFrom || currentYear,
+                          drinkTo: w.drinkTo || currentYear + 10,
+                          notes: w.notes || '',
+                          price: w.price || ''
+                        }));
+                        setWines([...wines, ...newWines]);
+                      } else {
+                        const newHistory = dataArray.map((h, i) => ({
+                          id: Date.now() + i,
+                          name: h.name || '',
+                          producer: h.producer || '',
+                          vintage: h.vintage || currentYear - 5,
+                          varietal: h.varietal || '',
+                          region: h.region || '',
+                          drinkDate: h.drinkDate || new Date().toISOString().split('T')[0],
+                          tastingNotes: h.tastingNotes || '',
+                          rating: h.rating || ''
+                        }));
+                        setDrunkWines([...drunkWines, ...newHistory]);
+                      }
                       
-                      setWines([...wines, ...newWines]);
                       setShowImportModal(false);
                       setImportJson('');
                     } catch (e) {
@@ -1169,7 +1225,7 @@ export default function WineCellar() {
                   }}
                   className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
                 >
-                  Import Wines
+                  Import {importType === 'inventory' ? 'Wines' : 'History'}
                 </button>
               </div>
             </div>
@@ -1266,4 +1322,3 @@ export default function WineCellar() {
     </div>
   );
 }
-

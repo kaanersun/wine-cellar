@@ -3,7 +3,19 @@
 @tailwind utilities;
 
 /* Ensure proper mobile viewport handling */
-html, body, #root {
+html {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  height: 100%;
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+
+#root {
   height: 100%;
   overflow: hidden;
 }
