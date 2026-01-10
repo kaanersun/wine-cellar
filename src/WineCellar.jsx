@@ -630,9 +630,6 @@ export default function WineCellar() {
                     </div>
                   );
                 })}
-                    </div>
-                  );
-                })}
               </div>
             )}
           </div>
