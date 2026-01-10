@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="wineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#991b1b"/>
+      <stop offset="100%" style="stop-color:#7f1d1d"/>
+    </linearGradient>
+  </defs>
+  <!-- Glass bowl -->
+  <path d="M30 15 Q30 50 50 60 Q70 50 70 15 Z" fill="url(#wineGradient)" opacity="0.9"/>
+  <!-- Wine level -->
+  <path d="M33 25 Q33 48 50 56 Q67 48 67 25 Z" fill="#450a0a"/>
+  <!-- Stem -->
+  <rect x="47" y="60" width="6" height="25" fill="#d6d3d1"/>
+  <!-- Base -->
+  <ellipse cx="50" cy="90" rx="20" ry="5" fill="#d6d3d1"/>
+</svg>
