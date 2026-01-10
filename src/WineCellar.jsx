@@ -546,84 +546,90 @@ export default function WineCellar() {
                   const windowStatus = getDrinkWindowStatus(wine);
                   return (
                     <div key={wine.id} className="bg-white rounded-lg border border-stone-200 p-4 hover:shadow-sm transition-shadow">
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-semibold text-stone-900">{wine.vintage} {wine.name}</h3>
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${windowStatus.color}`}>
-                                {windowStatus.label}
-                              </span>
-                            </div>
-                            <p className="text-sm text-stone-600 mt-0.5">{wine.producer}</p>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              onClick={() => {
-                                setFormData({
-                                  ...wine,
-                                  tastingNotes: '',
-                                  rating: '',
-                                  drinkDate: new Date().toISOString().split('T')[0]
-                                });
-                                setAddMode('history');
-                                setEditingId(null);
-                                setEditingDrunkId(null);
-                                setDrinkingFromId(wine.id);
-                                setShowAddForm(true);
-                              }}
-                              className="px-2 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
-                            >
-                              Drink
-                            </button>
-                            <div className="flex items-center bg-stone-100 rounded-lg">
-                              <button
-                                onClick={() => adjustQuantity(wine.id, -1)}
-                                className="w-7 h-7 flex items-center justify-center text-stone-600 hover:bg-stone-200 rounded-l-lg transition-colors text-sm"
-                              >
-                                −
-                              </button>
-                              <span className="w-6 text-center text-sm font-medium">{wine.quantity}</span>
-                              <button
-                                onClick={() => adjustQuantity(wine.id, 1)}
-                                className="w-7 h-7 flex items-center justify-center text-stone-600 hover:bg-stone-200 rounded-r-lg transition-colors text-sm"
-                              >
-                                +
-                              </button>
-                            </div>
-                            <button
-                              onClick={() => handleEdit(wine)}
-                              className="p-1.5 text-stone-400 hover:text-stone-600 transition-colors"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(wine.id)}
-                              className="p-1.5 text-stone-400 hover:text-red-600 transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                      {/* Row 1: Wine Name */}
+                      <h3 className="font-semibold text-stone-900">{wine.vintage} {wine.name}</h3>
+                      
+                      {/* Row 2: Status badge + action buttons */}
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${windowStatus.color}`}>
+                          {windowStatus.label}
+                        </span>
+                        <button
+                          onClick={() => {
+                            setFormData({
+                              ...wine,
+                              tastingNotes: '',
+                              rating: '',
+                              drinkDate: new Date().toISOString().split('T')[0]
+                            });
+                            setAddMode('history');
+                            setEditingId(null);
+                            setEditingDrunkId(null);
+                            setDrinkingFromId(wine.id);
+                            setShowAddForm(true);
+                          }}
+                          className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                        >
+                          Drink
+                        </button>
+                        <div className="flex items-center bg-stone-100 rounded-lg">
+                          <button
+                            onClick={() => adjustQuantity(wine.id, -1)}
+                            className="w-6 h-6 flex items-center justify-center text-stone-600 hover:bg-stone-200 rounded-l-lg transition-colors text-sm"
+                          >
+                            −
+                          </button>
+                          <span className="w-5 text-center text-sm font-medium">{wine.quantity}</span>
+                          <button
+                            onClick={() => adjustQuantity(wine.id, 1)}
+                            className="w-6 h-6 flex items-center justify-center text-stone-600 hover:bg-stone-200 rounded-r-lg transition-colors text-sm"
+                          >
+                            +
+                          </button>
                         </div>
-                        <div className="flex items-center gap-3 text-sm text-stone-500 whitespace-nowrap overflow-x-auto">
-                          {wine.varietal && <span>{wine.varietal}</span>}
-                          {wine.varietal && wine.region && <span className="text-stone-300">•</span>}
-                          {wine.region && (
-                            <span className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
-                              {wine.region}
-                            </span>
-                          )}
-                          {(wine.varietal || wine.region) && <span className="text-stone-300">•</span>}
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            {wine.drinkFrom}–{wine.drinkTo}
-                          </span>
-                        </div>
+                        <button
+                          onClick={() => handleEdit(wine)}
+                          className="p-1 text-stone-400 hover:text-stone-600 transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(wine.id)}
+                          className="p-1 text-stone-400 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
+                      
+                      {/* Row 3: Producer + Varietal */}
+                      <div className="flex items-center gap-2 mt-2 text-sm text-stone-600">
+                        <span>{wine.producer}</span>
+                        {wine.producer && wine.varietal && <span className="text-stone-300">•</span>}
+                        {wine.varietal && <span>{wine.varietal}</span>}
+                      </div>
+                      
+                      {/* Row 4: Region + Drink window */}
+                      <div className="flex items-center gap-2 mt-1 text-sm text-stone-500">
+                        {wine.region && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />
+                            {wine.region}
+                          </span>
+                        )}
+                        {wine.region && <span className="text-stone-300">•</span>}
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {wine.drinkFrom}–{wine.drinkTo}
+                        </span>
+                      </div>
+                      
+                      {/* Notes */}
                       {wine.notes && (
                         <p className="text-sm text-stone-500 mt-3 italic break-words">"{wine.notes}"</p>
-                      )}}
+                      )}
+                    </div>
+                  );
+                })}
                     </div>
                   );
                 })}
