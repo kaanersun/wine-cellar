@@ -5,7 +5,7 @@ const VARIETALS = ['Cabernet Sauvignon', 'Pinot Noir', 'Merlot', 'Syrah/Shiraz',
 const REGIONS = ['Napa Valley', 'Sonoma', 'Burgundy', 'Bordeaux', 'Rhône', 'Tuscany', 'Piedmont', 'Rioja', 'Willamette Valley', 'Barossa Valley', 'Marlborough', 'Other'];
 
 const analyzeWineLabel = async (base64Image, mediaType) => {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch("/api/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -47,7 +47,7 @@ const lookupDrinkWindow = async (producer, name, vintage, varietal) => {
   const searchQuery = `${vintage || ''} ${producer} ${name} drink window cellartracker`.trim();
   
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch("/api/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
