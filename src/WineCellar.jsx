@@ -114,6 +114,7 @@ export default function WineCellar() {
   const [importError, setImportError] = useState(null);
   const [importType, setImportType] = useState('inventory');
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const fileInputRef = useRef(null);
   const scanModeRef = useRef('cellar');
   const [loading, setLoading] = useState(true);
@@ -1312,12 +1313,66 @@ export default function WineCellar() {
                 </button>
               </div>
               
+              <div className="border-t border-stone-200 pt-4 mt-4">
+                <button
+                  onClick={() => setShowClearConfirm(true)}
+                  disabled={wines.length === 0 && drunkWines.length === 0}
+                  className="w-full flex items-center justify-between p-4 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-red-600"
+                >
+                  <div className="flex items-center gap-3">
+                    <Trash2 className="w-5 h-5" />
+                    <div className="text-left">
+                      <div className="font-medium">Clear All Data</div>
+                      <div className="text-sm text-red-400">Delete inventory & history</div>
+                    </div>
+                  </div>
+                </button>
+              </div>
+              
               <button
                 onClick={() => setShowExportModal(false)}
                 className="w-full px-4 py-2 border border-stone-300 text-stone-700 rounded-lg text-sm font-medium hover:bg-stone-50 transition-colors"
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear Data Confirmation Modal */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full">
+            <div className="p-6 text-center">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-6 h-6 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-stone-900 mb-2">Clear All Data?</h3>
+              <p className="text-sm text-stone-600 mb-6">
+                This will permanently delete {wines.length} wines from your inventory and {drunkWines.length} entries from your history. This cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowClearConfirm(false)}
+                  className="flex-1 px-4 py-2 border border-stone-300 text-stone-700 rounded-lg text-sm font-medium hover:bg-stone-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setWines([]);
+                    setDrunkWines([]);
+                    localStorage.removeItem('wine-cellar-inventory');
+                    localStorage.removeItem('wine-cellar-history');
+                    setShowClearConfirm(false);
+                    setShowExportModal(false);
+                  }}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+                >
+                  Clear All
+                </button>
+              </div>
             </div>
           </div>
         </div>
