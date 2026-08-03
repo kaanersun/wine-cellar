@@ -4,79 +4,71 @@ import { Wine, Plus, Search, MapPin, Calendar, Sparkles, X, ChevronDown, Trash2,
 const VARIETALS = ['Cabernet Sauvignon', 'Pinot Noir', 'Merlot', 'Syrah/Shiraz', 'Zinfandel', 'Chardonnay', 'Sauvignon Blanc', 'Riesling', 'Pinot Grigio', 'Rosé', 'Champagne/Sparkling', 'Other Red', 'Other White'];
 const REGIONS = ['Napa Valley', 'Sonoma', 'Burgundy', 'Bordeaux', 'Rhône', 'Tuscany', 'Piedmont', 'Rioja', 'Willamette Valley', 'Barossa Valley', 'Marlborough', 'Other'];
 
+// Phone photos are routinely 6-8 MB, which becomes ~11 MB once base64-encoded —
+// well past the 4.5 MB serverless request limit. Downscale before upload.
+const MAX_IMAGE_EDGE = 1600;
+
+const downscaleImage = (file) => new Promise((resolve, reject) => {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    const scale = Math.min(1, MAX_IMAGE_EDGE / Math.max(img.width, img.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    resolve({ image: dataUrl.split(',')[1], mediaType: 'image/jpeg' });
+  };
+
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    reject(new Error("Couldn't read that image"));
+  };
+
+  img.src = url;
+});
+
 const analyzeWineLabel = async (base64Image, mediaType) => {
   const response = await fetch("/api/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      messages: [{
-        role: "user",
-        content: [
-          {
-            type: "image",
-            source: { type: "base64", media_type: mediaType, data: base64Image }
-          },
-          {
-            type: "text",
-            text: `Analyze this wine label and extract the following information. Respond ONLY with a JSON object, no markdown or explanation:
-{
-  "name": "wine name (e.g., 'Reserve Cabernet', 'Clos du Val')",
-  "producer": "winery/producer name",
-  "vintage": year as number or null if not visible,
-  "varietal": "grape variety - must be one of: Cabernet Sauvignon, Pinot Noir, Merlot, Syrah/Shiraz, Zinfandel, Chardonnay, Sauvignon Blanc, Riesling, Pinot Grigio, Rosé, Champagne/Sparkling, Other Red, Other White",
-  "region": "wine region - should be one of: Napa Valley, Sonoma, Burgundy, Bordeaux, Rhône, Tuscany, Piedmont, Rioja, Willamette Valley, Barossa Valley, Marlborough, or Other if not matching",
-  "notes": "any other notable info from the label like vineyard designation, special notes, alcohol %, etc."
-}
-
-If you can't determine a field, use null.`
-          }
-        ]
-      }]
+      action: "analyzeLabel",
+      image: base64Image,
+      mediaType
     })
   });
-  
+
   const data = await response.json();
-  const text = data.content?.[0]?.text || '';
+  if (!response.ok) {
+    throw new Error(data.error?.message || `Label analysis failed (${response.status})`);
+  }
+  const text = data.content
+    ?.map(item => item.type === "text" ? item.text : "")
+    .filter(Boolean)
+    .join("\n") || '';
   const cleaned = text.replace(/```json|```/g, '').trim();
   return JSON.parse(cleaned);
 };
 
 const lookupDrinkWindow = async (producer, name, vintage, varietal) => {
-  const searchQuery = `${vintage || ''} ${producer} ${name} drink window cellartracker`.trim();
-  
   try {
+    const year = parseInt(vintage, 10);
     const response = await fetch("/api/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        tools: [{
-          type: "web_search_20250305",
-          name: "web_search"
-        }],
-        messages: [{
-          role: "user",
-          content: `Search for the drink window (when to drink) for this wine: ${vintage || ''} ${producer} ${name} ${varietal || ''}.
-
-Look for information from CellarTracker, Wine Spectator, Vivino, or other wine databases about when this specific wine should be consumed.
-
-Respond ONLY with a JSON object, no markdown:
-{
-  "drinkFrom": starting year as number,
-  "drinkTo": ending year as number,
-  "source": "where this info came from (e.g., 'CellarTracker community', 'Wine Spectator')",
-  "confidence": "high" or "medium" or "low",
-  "notes": "any relevant aging notes found"
-}
-
-If you can't find specific data for this wine, estimate based on the wine type and vintage, set confidence to "low", and note it's an estimate.`
-        }]
+        action: "drinkWindow",
+        producer,
+        name,
+        varietal,
+        vintage: Number.isInteger(year) ? year : null
       })
     });
-    
+
     const data = await response.json();
     const fullText = data.content
       ?.map(item => item.type === "text" ? item.text : "")
@@ -293,15 +285,8 @@ export default function WineCellar() {
     setShowAddForm(true);
     
     try {
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      
-      const mediaType = file.type || 'image/jpeg';
-      const result = await analyzeWineLabel(base64, mediaType);
+      const { image, mediaType } = await downscaleImage(file);
+      const result = await analyzeWineLabel(image, mediaType);
       
       // Set initial data from label
       setFormData(prev => ({
