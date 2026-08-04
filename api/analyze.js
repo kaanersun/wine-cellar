@@ -14,6 +14,17 @@ const ALLOWED_MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif
 
 const MAX_FIELD_CHARS = 200;
 
+// Upstream calls must be bounded. Without this a stalled Anthropic request runs
+// until Vercel kills the function at its 300s ceiling, burning the whole
+// duration budget and leaving the client spinning.
+// Both sit under the 60s maxDuration in vercel.json so the handler returns a
+// real 504 rather than being killed mid-flight.
+const UPSTREAM_TIMEOUT_MS = { analyzeLabel: 40_000, drinkWindow: 50_000 };
+
+// Cap how many searches the model runs. Unbounded, a single lookup can spend
+// minutes fanning out across retailer sites.
+const MAX_SEARCHES = 4;
+
 const VARIETALS = 'Cabernet Sauvignon, Pinot Noir, Merlot, Syrah/Shiraz, Zinfandel, Chardonnay, Sauvignon Blanc, Riesling, Pinot Grigio, Rosé, Champagne/Sparkling, Other Red, Other White';
 const REGIONS = 'Napa Valley, Sonoma, Burgundy, Bordeaux, Rhône, Tuscany, Piedmont, Rioja, Willamette Valley, Barossa Valley, Marlborough, or Other if not matching';
 
@@ -99,7 +110,10 @@ const buildDrinkWindowRequest = (body) => {
       model: MODEL,
       max_tokens: MAX_TOKENS,
       thinking: { type: 'disabled' },
-      tools: [{ type: 'web_search_20260209', name: 'web_search' }],
+      // Deliberately the basic search variant, not web_search_20260209. The
+      // newer version adds dynamic filtering, which runs server-side code
+      // execution on every search and pushed this call past 100s.
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: MAX_SEARCHES }],
       messages: [{ role: 'user', content: drinkWindowPrompt(producer, name, vintage, varietal) }]
     }
   };
@@ -131,6 +145,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: built.error });
   }
 
+  const startedAt = Date.now();
+
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -139,7 +155,8 @@ export default async function handler(req, res) {
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01'
       },
-      body: JSON.stringify(built.payload)
+      body: JSON.stringify(built.payload),
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS[body.action])
     });
 
     const data = await response.json();
@@ -150,9 +167,15 @@ export default async function handler(req, res) {
       return res.status(502).json({ error: 'Wine analysis is temporarily unavailable' });
     }
 
+    console.log(`${body.action} ok in ${Date.now() - startedAt}ms`);
     return res.status(200).json({ content: data.content });
   } catch (error) {
+    if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+      console.error(`${body.action} timed out after ${Date.now() - startedAt}ms`);
+      return res.status(504).json({ error: 'Wine analysis took too long' });
+    }
     console.error('API Error:', error);
     return res.status(500).json({ error: 'Wine analysis is temporarily unavailable' });
   }
 }
+

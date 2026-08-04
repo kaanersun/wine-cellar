@@ -60,6 +60,9 @@ const lookupDrinkWindow = async (producer, name, vintage, varietal) => {
     const response = await fetch("/api/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      // Slightly longer than the server's own 50s cap, so a real 504 wins the
+      // race and gets logged rather than being masked by a client abort.
+      signal: AbortSignal.timeout(55000),
       body: JSON.stringify({
         action: "drinkWindow",
         producer,
@@ -68,6 +71,7 @@ const lookupDrinkWindow = async (producer, name, vintage, varietal) => {
         vintage: Number.isInteger(year) ? year : null
       })
     });
+    if (!response.ok) return null;
 
     const data = await response.json();
     const fullText = data.content
@@ -101,6 +105,7 @@ export default function WineCellar() {
   const [scanning, setScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState(''); // 'reading' | 'lookup' | ''
   const [scanError, setScanError] = useState(null);
+  const [lookingUpDrinkWindow, setLookingUpDrinkWindow] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importJson, setImportJson] = useState('');
   const [importError, setImportError] = useState(null);
@@ -300,25 +305,27 @@ export default function WineCellar() {
         drinkDate: new Date().toISOString().split('T')[0]
       }));
       
-      // Now lookup drink window from web sources
+      // Drink-window lookup runs a web search and can take tens of seconds, so
+      // don't hold the form on it. The label is already filled in; this updates
+      // in place if and when it lands, and leaves the defaults alone if not.
       if (result.producer || result.name) {
-        setScanStatus('lookup');
-        const drinkData = await lookupDrinkWindow(
+        setLookingUpDrinkWindow(true);
+        lookupDrinkWindow(
           result.producer || '',
           result.name || '',
           result.vintage,
           result.varietal
-        );
-        
-        if (drinkData) {
-          setFormData(prev => ({
-            ...prev,
-            drinkFrom: drinkData.drinkFrom || prev.drinkFrom,
-            drinkTo: drinkData.drinkTo || prev.drinkTo,
-            notes: prev.notes + (drinkData.notes ? `\n${drinkData.source}: ${drinkData.notes}` : 
-              drinkData.source ? `\nDrink window from ${drinkData.source}` : '')
-          }));
-        }
+        ).then(drinkData => {
+          if (drinkData) {
+            setFormData(prev => ({
+              ...prev,
+              drinkFrom: drinkData.drinkFrom || prev.drinkFrom,
+              drinkTo: drinkData.drinkTo || prev.drinkTo,
+              notes: prev.notes + (drinkData.notes ? `\n${drinkData.source}: ${drinkData.notes}` :
+                drinkData.source ? `\nDrink window from ${drinkData.source}` : '')
+            }));
+          }
+        }).finally(() => setLookingUpDrinkWindow(false));
       }
     } catch (err) {
       console.error('Scan error:', err);
@@ -942,7 +949,15 @@ export default function WineCellar() {
                 {addMode !== 'history' && !editingDrunkId && (
                   <>
                     <div>
-                      <label className="block text-sm font-medium text-stone-700 mb-1">Drink From</label>
+                      <label className="block text-sm font-medium text-stone-700 mb-1 flex items-center gap-1.5">
+                        Drink From
+                        {lookingUpDrinkWindow && (
+                          <span className="flex items-center gap-1 text-xs font-normal text-stone-500">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            looking up…
+                          </span>
+                        )}
+                      </label>
                       <input
                         type="number"
                         min="1900"
