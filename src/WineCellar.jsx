@@ -117,6 +117,7 @@ export default function WineCellar({ session }) {
   const [addMode, setAddMode] = useState('cellar'); // 'cellar' | 'history'
   const [searchQuery, setSearchQuery] = useState('');
   const [filterVarietal, setFilterVarietal] = useState('');
+  const [filterRegion, setFilterRegion] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingDrunkId, setEditingDrunkId] = useState(null);
   const [drinkingFromId, setDrinkingFromId] = useState(null); // Track wine being consumed from inventory
@@ -447,8 +448,17 @@ export default function WineCellar({ session }) {
       wine.producer.toLowerCase().includes(searchQuery.toLowerCase()) ||
       wine.region.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesVarietal = filterVarietal === '' || wine.varietal === filterVarietal;
-    return matchesSearch && matchesVarietal;
+    const matchesRegion = filterRegion === '' || (wine.region || '').trim() === filterRegion;
+    return matchesSearch && matchesVarietal && matchesRegion;
   });
+
+  // Regions present in the cellar, with bottle counts, for the region filter.
+  const regionCounts = wines.reduce((counts, wine) => {
+    const region = (wine.region || '').trim();
+    if (region) counts[region] = (counts[region] || 0) + wine.quantity;
+    return counts;
+  }, {});
+  const regionOptions = Object.keys(regionCounts).sort((a, b) => a.localeCompare(b));
 
   const getRecommendations = () => {
     const now = currentYear;
@@ -563,6 +573,15 @@ export default function WineCellar({ session }) {
               >
                 <option value="">All Varietals</option>
                 {VARIETALS.map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+              <select
+                value={filterRegion}
+                onChange={(e) => setFilterRegion(e.target.value)}
+                className="px-4 py-2 border border-stone-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500"
+              >
+                <option value="">All Regions</option>
+                {regionOptions.map(r => <option key={r} value={r}>{r} ({regionCounts[r]})</option>)}
+                {filterRegion && !regionCounts[filterRegion] && <option value={filterRegion}>{filterRegion} (0)</option>}
               </select>
               <button
                 onClick={() => {
@@ -1258,6 +1277,7 @@ export default function WineCellar({ session }) {
                   ? 'Paste your wine inventory as JSON. Each wine should have: name, producer, vintage, varietal, region, quantity, drinkFrom, drinkTo.'
                   : 'Paste your tasting history as JSON. Each entry should have: name, producer, vintage, drinkDate, tastingNotes, rating.'
                 }
+                {' '}Or paste a whole file from Export All to import your inventory and history in one go.
               </p>
               
               <textarea
@@ -1293,39 +1313,65 @@ export default function WineCellar({ session }) {
                   onClick={() => {
                     try {
                       const parsed = JSON.parse(importJson);
-                      const dataArray = Array.isArray(parsed) ? parsed : [parsed];
-                      
-                      if (importType === 'inventory') {
-                        const newWines = dataArray.map((w, i) => ({
-                          id: Date.now() + i,
-                          name: w.name || '',
-                          producer: w.producer || '',
-                          vintage: w.vintage || currentYear - 5,
-                          varietal: w.varietal || '',
-                          region: w.region || '',
-                          quantity: w.quantity || 1,
-                          location: w.location || '',
-                          drinkFrom: w.drinkFrom || currentYear,
-                          drinkTo: w.drinkTo || currentYear + 10,
-                          notes: w.notes || '',
-                          price: w.price || ''
-                        }));
-                        setWines([...wines, ...newWines]);
+                      const toWine = (w, id) => ({
+                        id,
+                        name: w.name || '',
+                        producer: w.producer || '',
+                        vintage: w.vintage || currentYear - 5,
+                        varietal: w.varietal || '',
+                        region: w.region || '',
+                        quantity: w.quantity || 1,
+                        location: w.location || '',
+                        drinkFrom: w.drinkFrom || currentYear,
+                        drinkTo: w.drinkTo || currentYear + 10,
+                        notes: w.notes || '',
+                        price: w.price || ''
+                      });
+                      const toHistory = (h, id) => ({
+                        ...h,
+                        id,
+                        name: h.name || '',
+                        producer: h.producer || '',
+                        vintage: h.vintage || currentYear - 5,
+                        varietal: h.varietal || '',
+                        region: h.region || '',
+                        drinkDate: h.drinkDate || new Date().toISOString().split('T')[0],
+                        tastingNotes: h.tastingNotes || '',
+                        rating: h.rating || ''
+                      });
+
+                      const isFullExport = parsed && !Array.isArray(parsed) &&
+                        (Array.isArray(parsed.inventory) || Array.isArray(parsed.history));
+
+                      if (isFullExport) {
+                        // A file from Export All: import both lists, keeping their ids so
+                        // anything already in the cellar is skipped instead of duplicated.
+                        const takeNew = (items, existing, convert) => {
+                          const seen = new Set(existing.map(item => String(item.id)));
+                          const fresh = items.filter(item => item.id == null || !seen.has(String(item.id)));
+                          return {
+                            added: fresh.map((item, i) => convert(item, item.id ?? Date.now() + i)),
+                            skipped: items.length - fresh.length
+                          };
+                        };
+                        const inv = takeNew(parsed.inventory || [], wines, toWine);
+                        const hist = takeNew(parsed.history || [], drunkWines, toHistory);
+                        setWines([...wines, ...inv.added]);
+                        setDrunkWines([...drunkWines, ...hist.added]);
+                        const skipped = inv.skipped + hist.skipped;
+                        window.alert(
+                          `Imported ${inv.added.length} wines and ${hist.added.length} history entries.` +
+                          (skipped > 0 ? ` Skipped ${skipped} already in your cellar.` : '')
+                        );
                       } else {
-                        const newHistory = dataArray.map((h, i) => ({
-                          id: Date.now() + i,
-                          name: h.name || '',
-                          producer: h.producer || '',
-                          vintage: h.vintage || currentYear - 5,
-                          varietal: h.varietal || '',
-                          region: h.region || '',
-                          drinkDate: h.drinkDate || new Date().toISOString().split('T')[0],
-                          tastingNotes: h.tastingNotes || '',
-                          rating: h.rating || ''
-                        }));
-                        setDrunkWines([...drunkWines, ...newHistory]);
+                        const dataArray = Array.isArray(parsed) ? parsed : [parsed];
+                        if (importType === 'inventory') {
+                          setWines([...wines, ...dataArray.map((w, i) => toWine(w, Date.now() + i))]);
+                        } else {
+                          setDrunkWines([...drunkWines, ...dataArray.map((h, i) => toHistory(h, Date.now() + i))]);
+                        }
                       }
-                      
+
                       setShowImportModal(false);
                       setImportJson('');
                     } catch (e) {
