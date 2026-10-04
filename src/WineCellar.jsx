@@ -100,8 +100,9 @@ const readCache = (kind) => {
   try {
     const stored = localStorage.getItem(CACHE_KEYS[kind]);
     const items = stored ? JSON.parse(stored) : [];
-    // Sync is keyed by id, so make sure every entry has one.
-    return items.map((item, i) => item.id == null ? { ...item, id: Date.now() + i } : item);
+    // Sync is keyed by id, so make sure every entry has one. Deterministic, so
+    // reading the same cache twice can't upload an entry under two ids.
+    return items.map((item, i) => item.id == null ? { ...item, id: `legacy-${i}` } : item);
   } catch (e) {
     return [];
   }
