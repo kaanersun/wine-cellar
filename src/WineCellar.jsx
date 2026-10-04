@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Wine, Plus, Search, MapPin, Calendar, Sparkles, X, ChevronDown, Trash2, Edit2, Check, Camera, Loader2, Upload, BookOpen, Download, Share } from 'lucide-react';
+import { Wine, Plus, Search, MapPin, Calendar, Sparkles, X, ChevronDown, Trash2, Edit2, Check, Camera, Loader2, Upload, BookOpen, Download, Share, Cloud, CloudOff, LogOut } from 'lucide-react';
+import { supabase } from './supabase';
+import { snapshot, loadBaseline, saveBaseline, clearBaselines, fetchAll, pushChanges } from './sync';
 
 const VARIETALS = ['Cabernet Sauvignon', 'Pinot Noir', 'Merlot', 'Syrah/Shiraz', 'Zinfandel', 'Chardonnay', 'Sauvignon Blanc', 'Riesling', 'Pinot Grigio', 'Rosé', 'Champagne/Sparkling', 'Other Red', 'Other White'];
 const REGIONS = ['Napa Valley', 'Sonoma', 'Burgundy', 'Bordeaux', 'Rhône', 'Tuscany', 'Piedmont', 'Rioja', 'Willamette Valley', 'Barossa Valley', 'Marlborough', 'Other'];
@@ -91,7 +93,22 @@ const lookupDrinkWindow = async (producer, name, vintage, varietal) => {
   }
 };
 
-export default function WineCellar() {
+const KINDS = ['inventory', 'history'];
+const CACHE_KEYS = { inventory: 'wine-cellar-inventory', history: 'wine-cellar-history' };
+
+const readCache = (kind) => {
+  try {
+    const stored = localStorage.getItem(CACHE_KEYS[kind]);
+    const items = stored ? JSON.parse(stored) : [];
+    // Sync is keyed by id, so make sure every entry has one.
+    return items.map((item, i) => item.id == null ? { ...item, id: Date.now() + i } : item);
+  } catch (e) {
+    return [];
+  }
+};
+
+export default function WineCellar({ session }) {
+  const userId = session.user.id;
   const [wines, setWines] = useState([]);
   const [drunkWines, setDrunkWines] = useState([]);
   const [view, setView] = useState('inventory');
@@ -133,51 +150,123 @@ export default function WineCellar() {
     drinkDate: new Date().toISOString().split('T')[0]
   });
 
-  // Load wines from storage on mount
+  const [syncStatus, setSyncStatus] = useState('synced'); // 'synced' | 'syncing' | 'offline'
+  // Last state the server confirmed, per kind; changes are pushed as a diff against it.
+  const baselineRef = useRef({ inventory: {}, history: {} });
+  const latestRef = useRef({ inventory: [], history: [] });
+  latestRef.current = { inventory: wines, history: drunkWines };
+  const syncingRef = useRef(false);
+  const syncAgainRef = useRef(false);
+
+  const sync = async () => {
+    if (syncingRef.current) {
+      syncAgainRef.current = true;
+      return;
+    }
+    syncingRef.current = true;
+    setSyncStatus('syncing');
+    try {
+      for (const kind of KINDS) {
+        const next = await pushChanges(userId, kind, baselineRef.current[kind], latestRef.current[kind]);
+        baselineRef.current[kind] = next;
+        saveBaseline(userId, kind, next);
+      }
+      setSyncStatus('synced');
+    } catch (e) {
+      console.error('Sync failed:', e);
+      setSyncStatus('offline');
+    } finally {
+      syncingRef.current = false;
+      if (syncAgainRef.current) {
+        syncAgainRef.current = false;
+        sync();
+      }
+    }
+  };
+  const syncRef = useRef(sync);
+  syncRef.current = sync;
+
+  // Load: push any edits made offline since the last sync, then take the
+  // server's copy. On first sign-in, upload the existing local cellar. If the
+  // server can't be reached, fall back to the local copy.
   useEffect(() => {
-    const loadWines = () => {
-      try {
-        const stored = localStorage.getItem('wine-cellar-inventory');
-        if (stored) {
-          setWines(JSON.parse(stored));
+    let cancelled = false;
+
+    const load = async () => {
+      const result = {};
+      let offline = false;
+
+      for (const kind of KINDS) {
+        const local = readCache(kind);
+        const baseline = loadBaseline(userId, kind);
+        try {
+          if (baseline) {
+            await pushChanges(userId, kind, baseline, local);
+          }
+          let remote = await fetchAll(kind);
+          if (!baseline && remote.length === 0 && local.length > 0) {
+            // First sign-in on a device with data from before accounts existed.
+            await pushChanges(userId, kind, {}, local);
+            remote = local;
+          } else if (!baseline && local.length > 0) {
+            // The account already has data; keep this device's old copy aside.
+            localStorage.setItem(`${CACHE_KEYS[kind]}-backup`, JSON.stringify(local));
+          }
+          result[kind] = remote;
+          baselineRef.current[kind] = snapshot(remote);
+          saveBaseline(userId, kind, baselineRef.current[kind]);
+        } catch (e) {
+          console.error(`Could not load ${kind} from server:`, e);
+          offline = true;
+          result[kind] = local;
+          baselineRef.current[kind] = baseline || {};
         }
-      } catch (e) {
-        console.log('No existing cellar data');
       }
-      try {
-        const historyStored = localStorage.getItem('wine-cellar-history');
-        if (historyStored) {
-          setDrunkWines(JSON.parse(historyStored));
-        }
-      } catch (e) {
-        console.log('No existing history data');
-      }
+
+      if (cancelled) return;
+      setWines(result.inventory);
+      setDrunkWines(result.history);
+      setSyncStatus(offline ? 'offline' : 'synced');
       setLoading(false);
     };
-    loadWines();
-  }, []);
+    load();
 
-  // Save wines to storage whenever they change
-  useEffect(() => {
-    if (!loading) {
-      try {
-        localStorage.setItem('wine-cellar-inventory', JSON.stringify(wines));
-      } catch (e) {
-        console.error('Failed to save cellar:', e);
-      }
-    }
-  }, [wines, loading]);
+    return () => { cancelled = true; };
+  }, [userId]);
 
-  // Save drunk wines to storage whenever they change
+  // Cache locally and push to the server whenever data changes.
   useEffect(() => {
-    if (!loading) {
-      try {
-        localStorage.setItem('wine-cellar-history', JSON.stringify(drunkWines));
-      } catch (e) {
-        console.error('Failed to save history:', e);
-      }
+    if (loading) return;
+    try {
+      localStorage.setItem(CACHE_KEYS.inventory, JSON.stringify(wines));
+      localStorage.setItem(CACHE_KEYS.history, JSON.stringify(drunkWines));
+    } catch (e) {
+      console.error('Failed to save local copy:', e);
     }
-  }, [drunkWines, loading]);
+    const timer = setTimeout(() => syncRef.current(), 500);
+    return () => clearTimeout(timer);
+  }, [wines, drunkWines, loading]);
+
+  // Retry when the connection comes back, and periodically while offline.
+  useEffect(() => {
+    if (syncStatus !== 'offline') return;
+    const retry = () => syncRef.current();
+    window.addEventListener('online', retry);
+    const timer = setInterval(retry, 30000);
+    return () => {
+      window.removeEventListener('online', retry);
+      clearInterval(timer);
+    };
+  }, [syncStatus]);
+
+  const handleSignOut = async () => {
+    if (syncStatus !== 'synced' && !window.confirm('Some changes have not been saved to the cloud yet and will be lost. Sign out anyway?')) {
+      return;
+    }
+    KINDS.forEach(kind => localStorage.removeItem(CACHE_KEYS[kind]));
+    clearBaselines(userId);
+    await supabase.auth.signOut();
+  };
 
   // Export data to JSON file
   const exportToJson = (data, filename) => {
@@ -405,6 +494,21 @@ export default function WineCellar() {
               <span className="text-white font-medium">{totalBottles}</span> bottles
               {totalValue > 0 && <span className="ml-3"><span className="text-white font-medium">${totalValue.toLocaleString()}</span> value</span>}
               {drunkWines.length > 0 && <span className="ml-3"><span className="text-white font-medium">{drunkWines.length}</span> logged</span>}
+            </div>
+            <div className="flex items-center gap-3">
+              <span
+                title={syncStatus === 'synced' ? 'Saved to cloud' : syncStatus === 'syncing' ? 'Saving...' : 'Offline: changes saved on this device and will sync later'}
+                className={syncStatus === 'offline' ? 'text-amber-400' : 'text-stone-400'}
+              >
+                {syncStatus === 'syncing' ? <Loader2 className="w-4 h-4 animate-spin" /> : syncStatus === 'offline' ? <CloudOff className="w-4 h-4" /> : <Cloud className="w-4 h-4" />}
+              </span>
+              <button
+                onClick={handleSignOut}
+                title={`Sign out (${session.user.email})`}
+                className="text-stone-400 hover:text-white transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
@@ -1363,8 +1467,6 @@ export default function WineCellar() {
                   onClick={() => {
                     setWines([]);
                     setDrunkWines([]);
-                    localStorage.removeItem('wine-cellar-inventory');
-                    localStorage.removeItem('wine-cellar-history');
                     setShowClearConfirm(false);
                     setShowExportModal(false);
                   }}

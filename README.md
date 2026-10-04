@@ -67,13 +67,19 @@ claude
 
 ## Data Storage
 
-- **Local**: Data is stored in `localStorage` on your device
-- **Export**: Use the Export button to download JSON backups
-- **Import**: Use the Import button to restore from JSON
+Data is stored in [Supabase](https://supabase.com) (Postgres), so your cellar syncs across devices. You sign in with email and password.
 
-Storage keys:
-- `wine-cellar-inventory` - Your wine collection
-- `wine-cellar-history` - Tasting notes and history
+- **Cloud**: tables `wines` and `history`, one row per entry, protected by Row Level Security so each account only sees its own data
+- **Offline**: a copy is kept in `localStorage` (`wine-cellar-inventory`, `wine-cellar-history`); changes made offline sync when you're back online
+- **First sign-in**: if the account is empty, wines already stored on that device are uploaded
+- **Export / Import**: JSON backups still work as before
+
+### Supabase setup
+
+1. Create a Supabase project
+2. In the SQL Editor, run [`supabase/schema.sql`](supabase/schema.sql)
+3. In Authentication → URL Configuration, set the Site URL to your deployed URL (confirmation emails link there)
+4. The project URL and anon key are set in `src/supabase.js`; to use a different project, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
 
 ## Tech Stack
 
@@ -82,6 +88,7 @@ Storage keys:
 - Tailwind CSS
 - PWA (vite-plugin-pwa)
 - Lucide icons
+- Supabase (database and sign-in)
 - Claude API (for label scanning)
 
 ## Generating App Icons
@@ -104,8 +111,13 @@ wine-cellar/
 │   └── wine-icon.svg      # App icon
 ├── src/
 │   ├── WineCellar.jsx     # Main app component
+│   ├── Auth.jsx           # Sign-in screen
+│   ├── supabase.js        # Supabase client
+│   ├── sync.js            # Cloud sync
 │   ├── main.jsx           # Entry point
 │   └── index.css          # Tailwind styles
+├── supabase/
+│   └── schema.sql         # Database tables and security rules
 ├── index.html
 ├── package.json
 ├── vite.config.js         # Vite + PWA config
