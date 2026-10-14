@@ -4,7 +4,7 @@ A personal wine cellar tracker: scan a label, get the details filled in, know wh
 
 **Live:** https://wine-cellar-zeta.vercel.app
 
-[Screenshot or short GIF here: the cellar view and a label scan]
+<img width="1125" height="2436" alt="image" src="https://github.com/user-attachments/assets/cbd93620-0a11-40d7-8ff9-8a1db799d69e" />
 
 ## What it does
 
@@ -19,9 +19,9 @@ A personal wine cellar tracker: scan a label, get the details filled in, know wh
 
 I'm an operator, not an engineer. I built this by directing Claude Code: describing the behavior I wanted, reading what it produced, and sending back what was wrong. The code is the agent's; the product decisions, the data model, and the review are mine.
 
-Things I pushed back on or changed during the build: [two or three specifics, e.g. the sync conflict rule between offline and cloud copies, how drink windows are scored, what the label scanner should do when it isn't confident].
+Things I pushed back on or changed during the build: the sync conflict rule between offline and cloud copies, how drink windows are scored, what the label scanner should do when it isn't confident.
 
-What I'd do differently: [one or two honest items, e.g. move the Supabase config to env vars from the start, add tests around sync].
+What I'd do differently: move the Supabase config to env vars from the start, add tests around sync.
 
 ## Architecture
 
