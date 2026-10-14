@@ -1,130 +1,32 @@
 # Wine Cellar
 
-A personal wine cellar tracker with label scanning, drink windows, and tasting notes.
+A personal wine cellar tracker: scan a label, get the details filled in, know what to open tonight. Built on Supabase, deployed on Vercel, installable as a mobile app.
 
-## Features
+**Live:** https://wine-cellar-zeta.vercel.app
 
-- 📷 Scan wine labels to auto-fill details (uses Claude API)
-- 🍷 Track cellar inventory with locations and quantities
-- ⏰ Drink window recommendations from CellarTracker & wine databases
-- ✨ "What to Open" suggestions prioritized by urgency
-- 📖 Wine journal with tasting notes and ratings
-- 📱 Works offline as a mobile app (PWA)
-- 💾 Export/Import data as JSON
+[Screenshot or short GIF here: the cellar view and a label scan]
 
-## Quick Start
+## What it does
 
-```bash
-# Install dependencies
-npm install
+- Scan a wine label and auto-fill producer, vintage, region, and grape (Claude API)
+- Track inventory by location and quantity
+- Drink-window recommendations and a "What to Open" list ranked by urgency
+- Tasting journal with notes and ratings
+- Works offline as a PWA; changes sync when you're back online
+- JSON export and import
 
-# Start development server
-npm run dev
+## How this was built
 
-# Open http://localhost:5173 in your browser
-```
+I'm an operator, not an engineer. I built this by directing Claude Code: describing the behavior I wanted, reading what it produced, and sending back what was wrong. The code is the agent's; the product decisions, the data model, and the review are mine.
 
-## Deploy to Vercel (Recommended)
+Things I pushed back on or changed during the build: [two or three specifics, e.g. the sync conflict rule between offline and cloud copies, how drink windows are scored, what the label scanner should do when it isn't confident].
 
-1. **Push to GitHub:**
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   gh repo create wine-cellar --public --push
-   ```
+What I'd do differently: [one or two honest items, e.g. move the Supabase config to env vars from the start, add tests around sync].
 
-2. **Deploy to Vercel:**
-   - Go to [vercel.com](https://vercel.com) and sign in with GitHub
-   - Click "New Project" → Import your repo → Deploy
-   - Takes about 60 seconds
+## Architecture
 
-3. **Add to your phone:**
-   - Open your Vercel URL on your phone
-   - **iOS**: Safari → Share → "Add to Home Screen"
-   - **Android**: Chrome → Menu → "Install app"
-
-## Alternative: Deploy to Netlify
-
-```bash
-npm run build
-npx netlify deploy --prod --dir=dist
-```
-
-## Using with Claude Code
-
-Export your wine data from the app, then use it with Claude Code:
-
-```bash
-# Start Claude Code in your project directory
-claude
-
-# Ask Claude to analyze your collection
-> "Load wine-cellar-full-2026-01-10.json and tell me which wines I should drink soon"
-> "Create a chart showing my wine collection by region"
-> "Find wines in my cellar that pair well with steak"
-```
-
-## Data Storage
-
-Data is stored in [Supabase](https://supabase.com) (Postgres), so your cellar syncs across devices. You sign in with email and password.
-
-- **Cloud**: tables `wines` and `history`, one row per entry, protected by Row Level Security so each account only sees its own data
-- **Offline**: a copy is kept in `localStorage` (`wine-cellar-inventory`, `wine-cellar-history`); changes made offline sync when you're back online
-- **First sign-in**: if the account is empty, wines already stored on that device are uploaded
-- **Export / Import**: JSON backups still work as before
-
-### Supabase setup
-
-1. Create a Supabase project
-2. In the SQL Editor, run [`supabase/schema.sql`](supabase/schema.sql)
-3. In Authentication → URL Configuration, set the Site URL to your deployed URL (confirmation emails link there)
-4. The project URL and anon key are set in `src/supabase.js`; to use a different project, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
-
-## Tech Stack
-
-- React 18
-- Vite
-- Tailwind CSS
-- PWA (vite-plugin-pwa)
-- Lucide icons
-- Supabase (database and sign-in)
-- Claude API (for label scanning)
-
-## Generating App Icons
-
-The app needs PNG icons for PWA. Create them from the SVG:
-
-```bash
-# Using ImageMagick
-convert -background none public/wine-icon.svg -resize 192x192 public/wine-icon-192.png
-convert -background none public/wine-icon.svg -resize 512x512 public/wine-icon-512.png
-
-# Or use an online tool like realfavicongenerator.net
-```
-
-## Project Structure
-
-```
-wine-cellar/
-├── public/
-│   └── wine-icon.svg      # App icon
-├── src/
-│   ├── WineCellar.jsx     # Main app component
-│   ├── Auth.jsx           # Sign-in screen
-│   ├── supabase.js        # Supabase client
-│   ├── sync.js            # Cloud sync
-│   ├── main.jsx           # Entry point
-│   └── index.css          # Tailwind styles
-├── supabase/
-│   └── schema.sql         # Database tables and security rules
-├── index.html
-├── package.json
-├── vite.config.js         # Vite + PWA config
-├── tailwind.config.js
-└── postcss.config.js
-```
-
-## License
-
-MIT - Use it however you'd like!
+- **Frontend:** React 18, Vite, Tailwind, vite-plugin-pwa
+- **Database and auth:** Supabase. Postgres tables `wines` and `history`, one row per entry; email and password sign-in
+- **Security:** Row Level Security on both tables, so each account sees only its own rows. The Supabase project URL and anon key are public by design; the policies in `supabase/schema.sql` are what protect the data
+- **Label scanning:** a serverless function in `api/` calls the Claude API, so the API key stays server-side and never ships to the browser
+- **Offline:** a `localStorage` copy of inventory and history; writes made offline are synced on reconnect. On first sign-in, wines already on the device are uploaded to the empty account
